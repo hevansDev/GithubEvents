@@ -1,3 +1,4 @@
-requests
-git+https://github.com/dpkp/kafka-python.git
+aiohttp==3.9.0b0
+confluent-kafka
+PyGithub
 python-dotenv
