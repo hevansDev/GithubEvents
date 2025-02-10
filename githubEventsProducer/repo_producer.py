@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import time
+import uuid
+from datetime import datetime, timezone
 import json
 from confluent_kafka import Producer
 from github import Github, Auth
@@ -46,9 +49,20 @@ topic = "github-repo-topic"
 # Initialize Github client
 g = Github(auth=Auth.Token(github_auth))
 
+def produce_with_timestamp(producer, topic, key, value):
+    # Get current timestamp in milliseconds
+    timestamp_ms = int(time.time() * 1000)
+    
+    producer.produce(
+        topic=topic,
+        key=key.encode('utf-8'),
+        value=value.encode('utf-8'),
+        timestamp=timestamp_ms,  # Add explicit timestamp
+        callback=delivery_callback
+    )
+
 try:
     # Search for repositories, sorted by stars in descending order
-    # This is more efficient than iterating through all users
     repos = g.search_repositories(query='stars:>1', sort='stars', order='desc')
     
     # Get the first 1000 repositories
@@ -60,22 +74,29 @@ try:
         try:
             repo_json = repo.raw_data
             
-            # Get open issues
-            #issues = repo.get_issues(state='open')
-            #issues_json = [issue.raw_data for issue in issues]
-            #repo_json["issues"] = issues_json
+            # Add timestamp to the data itself
+            current_time = datetime.now(timezone.utc)
+            repo_json['producer_timestamp'] = datetime.now(timezone.utc).isoformat()
+
+            # Create a unique key combining repo id and timestamp
+            unique_key = "{}_{}_{}".format(
+                repo.id,
+                int(time.time() * 1000),
+                str(uuid.uuid4())
+            )
             
-            # Produce message to Kafka with a key
             producer.produce(
-                topic, 
-                key=str(repo.id).encode('utf-8'),  # Add a key
+                topic=topic,
+                key=unique_key.encode('utf-8'),  # Using unique key
                 value=json.dumps(repo_json).encode('utf-8'), 
+                timestamp=int(current_time.timestamp() * 1000),
                 callback=delivery_callback
             )
             
-            # Poll to handle delivery reports
-            producer.poll(0)
+            # Add a small delay between messages
+            time.sleep(0.1)  # 100ms delay
             
+            producer.poll(0)
             count += 1
             
             if count % 100 == 0:
