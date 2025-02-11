@@ -53,6 +53,17 @@ sudo crontab -e
 0 * * * * /path/to/github-events/githubEventsProducer/.venv/bin/python3 /path/to/github-events/githubEventsProducer/repo_producer.py
 ```
 
+Add two new data sources to Druid, one for each topic with default settings. Set bootstrap server, topic name, and the following Kafka consumer config (with your own relevant details):
+
+```bash
+{
+  "bootstrap.servers": "<bootstrap server>",
+  "security.protocol": "SASL_SSL",
+  "sasl.mechanism": "PLAIN",
+  "sasl.jaas.config": "org.apache.kafka.common.security.plain.PlainLoginModule  required username=\"<username>\" password=\"<password>";"
+}
+```
+
 ## Usage
 
 [View Dashboards](http://localhost:3000/) (password and username are both `druid`)
